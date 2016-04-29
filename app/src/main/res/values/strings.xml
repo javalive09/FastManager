@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">AppManager</string>
+    <string name="action_help">帮助</string>
+    <string name="action_help_txt">单击进入应用管理页, 长按启动应用, 上次操作过的应用显示在首行</string>
+    <string name="action_about">关于</string>
+    <string name="action_about_txt">程序快速管理工具,可以清缓存,卸载软件</string>
+    <string name="action_feedback">反馈</string>
+    <string name="action_feedback_txt">程序快速管理工具,可以清缓存,卸载软件</string>
+    <item name="appinfo" type="id"></item>
+
+    <string name="setting_feedback">反馈建议</string>
+    <string name="setting_feedback_body">您的反馈和建议</string>
+    <string name="setting_feedback_address">mailto:javalive09@163.com</string>
+
+</resources>
