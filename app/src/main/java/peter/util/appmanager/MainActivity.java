@@ -22,13 +22,21 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, View.OnLongClickListener {
 
+    AppAdapter appAdapter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ListView list = (ListView) findViewById(R.id.app_list);
-        AppAdapter appAdapter = new AppAdapter(this, getAllAppInfos());
+        appAdapter = new AppAdapter(this);
         list.setAdapter(appAdapter);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        appAdapter.updataData(getAllAppInfos());
     }
 
     /**
@@ -65,9 +73,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case android.R.id.home:
-                finish();
-                break;
             case R.id.action_help:
                 showAlertDialog(getString(R.string.action_help),
                         getString(R.string.action_help_txt));

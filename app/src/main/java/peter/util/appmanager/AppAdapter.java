@@ -1,5 +1,7 @@
 package peter.util.appmanager;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
@@ -27,9 +29,10 @@ import android.widget.TextView;
 
 public class AppAdapter extends BaseAdapter {
 
-    private List<AppInfo> mAppInfos;
+    private List<AppInfo> mAppInfos = new ArrayList<>(1);
     private MainActivity mAct;
     private LruCache<String, Bitmap> mMemoryCache;
+    private HashMap<String, String> mAppNames = new HashMap<>();
     private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
     private static final int CORE_POOL_SIZE = CPU_COUNT;
     private static final int MAXIMUM_POOL_SIZE = CPU_COUNT;
@@ -44,9 +47,8 @@ public class AppAdapter extends BaseAdapter {
         }
     };
 
-    public AppAdapter(MainActivity act, List<AppAdapter.AppInfo> list) {
+    public AppAdapter(MainActivity act) {
         mAct = act;
-        mAppInfos = list;
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
         int mCacheSize = maxMemory / 5;
         //给LruCache分配
@@ -61,6 +63,11 @@ public class AppAdapter extends BaseAdapter {
         };
         thread_pool_executor = new ThreadPoolExecutor(CORE_POOL_SIZE, MAXIMUM_POOL_SIZE, KEEP_ALIVE, TimeUnit.SECONDS,
                 sPoolWorkQueue, sThreadFactory, new ThreadPoolExecutor.DiscardOldestPolicy());
+    }
+
+    public void updataData(List<AppAdapter.AppInfo> list) {
+        mAppInfos = list;
+        notifyDataSetChanged();
     }
 
     @Override
@@ -106,10 +113,10 @@ public class AppAdapter extends BaseAdapter {
         if (bmIcon == null) {
             cache.app_icon.setImageResource(R.mipmap.ic_launcher);
             cache.app_name.setText("...");
-            thread_pool_executor.execute(new ThreadPoolTask(mAct, cache, info, mMemoryCache));
+            thread_pool_executor.execute(new ThreadPoolTask(mAct, cache, info, mMemoryCache, mAppNames));
         } else {
             cache.app_icon.setImageBitmap(bmIcon);
-            cache.app_name.setText(info.appName);
+            cache.app_name.setText(mAppNames.get(info.packageName));
         }
 
         return convertView;
@@ -123,13 +130,15 @@ public class AppAdapter extends BaseAdapter {
         PackageManager mPm;
         AppInfo mInfo;
         MainActivity mAct;
+        HashMap<String, String> mAppNames;
 
-        public ThreadPoolTask(MainActivity act, ViewCache cache, AppInfo info, LruCache<String, Bitmap> memoryCache) {
+        public ThreadPoolTask(MainActivity act, ViewCache cache, AppInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
             mCache = cache;
             mInfo = info;
             mPm = act.getPackageManager();
             mMemoryCache = memoryCache;
             mAct = act;
+            mAppNames = names;
         }
 
         @Override
@@ -147,6 +156,7 @@ public class AppAdapter extends BaseAdapter {
                     BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
                     final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable).getBitmap();
                     mMemoryCache.put(mInfo.packageName, bmIcon);
+                    mAppNames.put(mInfo.packageName,mInfo.appName);
                     if (mCache.currentInfoId == mInfo.hashCode()) {
                         mAct.runOnUiThread(new Runnable() {
 
