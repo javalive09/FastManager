@@ -23,6 +23,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, View.OnLongClickListener {
 
     AppAdapter appAdapter;
+    boolean refresh;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,19 +49,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         PackageManager pm = getPackageManager();
         List<ApplicationInfo> appList = pm.getInstalledApplications(0);
         List<AppAdapter.AppInfo> allNoSystemApps = new ArrayList<>(appList.size());
-        String headPackageName = getHeadPackageName();
-        for (ApplicationInfo info : appList) {// 非系统APP
-            if (info != null && !isSystemApp(info)
-                    && !info.packageName.equals(getPackageName())) {
-                AppAdapter.AppInfo inf = new AppAdapter.AppInfo();
-                inf.packageName = info.packageName;
-                if (inf.packageName.equals(headPackageName)) {
-                    allNoSystemApps.add(0, inf);
-                } else {
+        if (refresh) {
+            for (ApplicationInfo info : appList) {// 非系统APP
+                if (info != null && !isSystemApp(info)
+                        && !info.packageName.equals(getPackageName())) {
+                    AppAdapter.AppInfo inf = new AppAdapter.AppInfo();
+                    inf.packageName = info.packageName;
                     allNoSystemApps.add(inf);
                 }
             }
+        } else {
+            String headPackageName = getHeadPackageName();
+            for (ApplicationInfo info : appList) {// 非系统APP
+                if (info != null && !isSystemApp(info)
+                        && !info.packageName.equals(getPackageName())) {
+                    AppAdapter.AppInfo inf = new AppAdapter.AppInfo();
+                    inf.packageName = info.packageName;
+                    if (inf.packageName.equals(headPackageName)) {
+                        allNoSystemApps.add(0, inf);
+                    } else {
+                        allNoSystemApps.add(inf);
+                    }
+                }
+            }
+            refresh = true;
         }
+
         Collections.sort(allNoSystemApps, AppComparator);
         return allNoSystemApps;
     }
@@ -90,7 +104,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     public void sendMailByIntent() {
-        Intent data=new Intent(Intent.ACTION_SENDTO);
+        Intent data = new Intent(Intent.ACTION_SENDTO);
         data.setData(Uri.parse(getString(R.string.setting_feedback_address)));
         data.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.setting_feedback));
         data.putExtra(Intent.EXTRA_TEXT, getString(R.string.setting_feedback_body));
