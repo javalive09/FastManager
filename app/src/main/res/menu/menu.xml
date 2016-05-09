@@ -13,7 +13,15 @@
         android:title="@string/action_about"/>
     <item
         android:id="@+id/action_feedback"
-        android:orderInCategory="8"
+        android:orderInCategory="3"
         android:title="@string/action_feedback"/>
+    <item
+        android:id="@+id/action_all_app"
+        android:orderInCategory="4"
+        android:title="@string/action_allapp"/>
+    <item
+        android:id="@+id/action_third_app"
+        android:orderInCategory="5"
+        android:title="@string/action_thirdapp"/>
 
 </menu>

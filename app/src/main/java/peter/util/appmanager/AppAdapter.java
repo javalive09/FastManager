@@ -106,7 +106,6 @@ public class AppAdapter extends BaseAdapter {
         cache.currentInfoId = info.hashCode();
         convertView.setTag(R.id.appinfo, info);
         convertView.setOnClickListener(mAct);
-        convertView.setOnLongClickListener(mAct);
 
         //取缓存图片
         Bitmap bmIcon = mMemoryCache.get(info.packageName);
