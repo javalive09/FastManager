@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -26,10 +27,10 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     AppAdapter appAdapter;
-    boolean refresh;
     private static final int NO_SYS = 0;
     private static final int ALL = 1;
     private int showType;
+    ApplicationInfo clickInfo;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,37 +71,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      *
      * @return
      */
-    private List<AppAdapter.AppInfo> getAllAppInfos() {
+    private List<ApplicationInfo> getAllAppInfos() {
         PackageManager pm = getPackageManager();
-        List<ApplicationInfo> appList = pm.getInstalledApplications(0);
-        List<AppAdapter.AppInfo> allNoSystemApps = new ArrayList<>(appList.size());
-        if (refresh) {
-            for (ApplicationInfo info : appList) {// 非系统APP
-                if (info != null && !isSystemApp(info)
-                        && !info.packageName.equals(getPackageName())) {
-                    AppAdapter.AppInfo inf = new AppAdapter.AppInfo();
-                    inf.packageName = info.packageName;
-                    allNoSystemApps.add(inf);
+        List<ApplicationInfo> appList = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        List<ApplicationInfo> allNoSystemApps = new ArrayList<>(appList.size());
+        String headPackageName = getHeadPackageName();
+        Log.i("peter", "headPackageName = " + headPackageName);
+        for (ApplicationInfo info : appList) {// 非系统APP
+            if (info != null && !isSystemApp(info)
+                    && !info.packageName.equals(getPackageName())) {
+                if (info.packageName.equals(headPackageName)) {
+                    allNoSystemApps.add(0, info);
+                } else {
+                    allNoSystemApps.add(info);
                 }
             }
-        } else {
-            String headPackageName = getHeadPackageName();
-            for (ApplicationInfo info : appList) {// 非系统APP
-                if (info != null && !isSystemApp(info)
-                        && !info.packageName.equals(getPackageName())) {
-                    AppAdapter.AppInfo inf = new AppAdapter.AppInfo();
-                    inf.packageName = info.packageName;
-                    if (inf.packageName.equals(headPackageName)) {
-                        allNoSystemApps.add(0, inf);
-                    } else {
-                        allNoSystemApps.add(inf);
-                    }
-                }
-            }
-            refresh = true;
         }
-
-        Collections.sort(allNoSystemApps, AppComparator);
         return allNoSystemApps;
     }
 
@@ -112,10 +98,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.action_help:
-                showAlertDialog(getString(R.string.action_help),
-                        getString(R.string.action_help_txt));
-                break;
+//            case R.id.action_help:
+//                showAlertDialog(getString(R.string.action_help),
+//                        getString(R.string.action_help_txt));
+//                break;
             case R.id.action_about:
                 showAlertDialog(getString(R.string.action_about),
                         getString(R.string.action_about_txt));
@@ -145,7 +131,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private boolean isSystemApp(ApplicationInfo appInfo) {
-        if(showType == ALL) {
+        if (showType == ALL) {
             return false;
         }
         if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) > 0) {// system apps
@@ -166,41 +152,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onClick(View v) {
-        addClickCount(v);
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             popupMenu(v);
-        }else {
+        } else {
             popupMenuNormal(v);
         }
     }
-
-    Comparator<AppAdapter.AppInfo> AppComparator = new Comparator<AppAdapter.AppInfo>() {
-
-        @Override
-        public int compare(AppAdapter.AppInfo lhs, AppAdapter.AppInfo rhs) {
-            if (lhs.count < rhs.count) {
-                return 1;
-            } else if (lhs.count > rhs.count) {
-                return -1;
-            }
-            return 0;
-        }
-    };
 
     private String getHeadPackageName() {
         return getSharedPreferences("head_item", MODE_PRIVATE).getString("package_name", "");
     }
 
-    private void addClickCount(View v) {
-        AppAdapter.AppInfo info = (AppAdapter.AppInfo) v.getTag(R.id.appinfo);
+    private void addClickCount(ApplicationInfo info ) {
         if (info != null) {
-            SharedPreferences sp = getSharedPreferences("head_item", MODE_PRIVATE);
-            sp.edit().putString("package_name", info.packageName).commit();
+            SharedPreferences headSp = getSharedPreferences("head_item", MODE_PRIVATE);
+            headSp.edit().putString("package_name", info.packageName).commit();
         }
     }
 
-    private void showDetailStopView(View v) {
-        AppAdapter.AppInfo info = (AppAdapter.AppInfo) v.getTag(R.id.appinfo);
+    @Override
+    protected void onDestroy() {
+        addClickCount(clickInfo);
+        super.onDestroy();
+
+    }
+
+    private void showDetailStopView(ApplicationInfo info) {
         if (info != null) {
             int version = Build.VERSION.SDK_INT;
             Intent intent = new Intent();
@@ -219,8 +196,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private void uninstallAPP(View v) {
-        AppAdapter.AppInfo info = (AppAdapter.AppInfo) v.getTag(R.id.appinfo);
+    private void uninstallAPP(ApplicationInfo info) {
         if (info != null) {
             Uri uri = Uri.parse("package:" + info.packageName);
             Intent intent = new Intent(Intent.ACTION_DELETE);
@@ -229,22 +205,36 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    private Intent getLaunchIntent(ApplicationInfo info) {
+        return getPackageManager().getLaunchIntentForPackage(
+                info.packageName);
+    }
+
     @TargetApi(Build.VERSION_CODES.M)
     private void popupMenu(final View anchor) {
+        final ApplicationInfo info = (ApplicationInfo) anchor.getTag(R.id.appinfo);
         PopupMenu popup = new PopupMenu(this, anchor);
         popup.setGravity(Gravity.END);
-        popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
+        final Intent launchIntent = getLaunchIntent(info);
+        if(launchIntent != null) {
+            popup.getMenuInflater().inflate(R.menu.operate1, popup.getMenu());
+        }else {
+            popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
+        }
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             public boolean onMenuItemClick(MenuItem item) {
                 switch (item.getItemId()) {
+                    case R.id.action_launch:
+                        startActivity(launchIntent);
+                        break;
                     case R.id.action_detail:
-                        showDetailStopView(anchor);
+                        showDetailStopView(info);
                         break;
                     case R.id.action_uninstall:
-                        uninstallAPP(anchor);
+                        uninstallAPP(info);
                         break;
                 }
-
+                clickInfo = info;
                 return true;
             }
         });
@@ -252,19 +242,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void popupMenuNormal(final View anchor) {
+        final ApplicationInfo info = (ApplicationInfo) anchor.getTag(R.id.appinfo);
         PopupMenu popup = new PopupMenu(this, anchor);
-        popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
+        final Intent launchIntent = getLaunchIntent(info);
+        if(launchIntent != null) {
+            popup.getMenuInflater().inflate(R.menu.operate1, popup.getMenu());
+        }else {
+            popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
+        }
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             public boolean onMenuItemClick(MenuItem item) {
                 switch (item.getItemId()) {
+                    case R.id.action_launch:
+                        startActivity(launchIntent);
+                        break;
                     case R.id.action_detail:
-                        showDetailStopView(anchor);
+                        showDetailStopView(info);
                         break;
                     case R.id.action_uninstall:
-                        uninstallAPP(anchor);
+                        uninstallAPP(info);
                         break;
                 }
-
+                clickInfo = info;
                 return true;
             }
         });

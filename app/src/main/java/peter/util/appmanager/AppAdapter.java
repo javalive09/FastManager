@@ -21,6 +21,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.support.v4.util.LruCache;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -29,7 +30,8 @@ import android.widget.TextView;
 
 public class AppAdapter extends BaseAdapter {
 
-    private List<AppInfo> mAppInfos = new ArrayList<>(1);
+    private List<ApplicationInfo> mAppInfos = new ArrayList<>(1);
+    LayoutInflater factory;
     private MainActivity mAct;
     private LruCache<String, Bitmap> mMemoryCache;
     private HashMap<String, String> mAppNames = new HashMap<>();
@@ -49,6 +51,7 @@ public class AppAdapter extends BaseAdapter {
 
     public AppAdapter(MainActivity act) {
         mAct = act;
+        factory = LayoutInflater.from(act);
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
         int mCacheSize = maxMemory / 5;
         //给LruCache分配
@@ -65,7 +68,7 @@ public class AppAdapter extends BaseAdapter {
                 sPoolWorkQueue, sThreadFactory, new ThreadPoolExecutor.DiscardOldestPolicy());
     }
 
-    public void updataData(List<AppAdapter.AppInfo> list) {
+    public void updataData(List<ApplicationInfo> list) {
         mAppInfos = list;
         notifyDataSetChanged();
     }
@@ -76,7 +79,7 @@ public class AppAdapter extends BaseAdapter {
     }
 
     @Override
-    public AppInfo getItem(int position) {
+    public ApplicationInfo getItem(int position) {
         return mAppInfos != null ? mAppInfos.get(position) : null;
     }
 
@@ -88,12 +91,12 @@ public class AppAdapter extends BaseAdapter {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         // 获取数据
-        AppInfo info = getItem(position);
+        ApplicationInfo info = getItem(position);
 
         // 获取View
         ViewCache cache;
         if (convertView == null) {
-            convertView = View.inflate(mAct, R.layout.listviewitem, null);
+            convertView = factory.inflate(R.layout.listviewitem, parent, false);
             cache = new ViewCache();
             cache.app_icon = (ImageView) convertView.findViewById(R.id.app_icon);
             cache.app_name = (TextView) convertView.findViewById(R.id.app_name);
@@ -127,11 +130,11 @@ public class AppAdapter extends BaseAdapter {
         ViewCache mCache;
         LruCache<String, Bitmap> mMemoryCache;
         PackageManager mPm;
-        AppInfo mInfo;
+        ApplicationInfo mInfo;
         MainActivity mAct;
         HashMap<String, String> mAppNames;
 
-        public ThreadPoolTask(MainActivity act, ViewCache cache, AppInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
+        public ThreadPoolTask(MainActivity act, ViewCache cache, ApplicationInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
             mCache = cache;
             mInfo = info;
             mPm = act.getPackageManager();
@@ -142,30 +145,44 @@ public class AppAdapter extends BaseAdapter {
 
         @Override
         public void run() {
-            ApplicationInfo info = null;
-            try {
-                info = mPm.getApplicationInfo(mInfo.packageName, PackageManager.GET_META_DATA);
-                mInfo.appName = info.loadLabel(mPm).toString();
-            } catch (NameNotFoundException e) {
-                e.printStackTrace();
-            }
-            if (info != null) {
-                Drawable drawable = info.loadIcon(mPm);
-                if(drawable instanceof BitmapDrawable) {
-                    BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
-                    final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable).getBitmap();
-                    mMemoryCache.put(mInfo.packageName, bmIcon);
-                    mAppNames.put(mInfo.packageName,mInfo.appName);
-                    if (mCache.currentInfoId == mInfo.hashCode()) {
-                        mAct.runOnUiThread(new Runnable() {
+            mAppNames.put(mInfo.packageName, mInfo.loadLabel(mPm).toString());
+            if(mCache.currentInfoId == mInfo.hashCode()) {
+                mAct.runOnUiThread(new Runnable() {
 
-                            @Override
-                            public void run() {
-                                mCache.app_icon.setImageBitmap(bmIcon);
-                                mCache.app_name.setText(mInfo.appName);
-                            }
-                        });
+                    @Override
+                    public void run() {
+                        mCache.app_name.setText(mAppNames.get(mInfo.packageName));
                     }
+                });
+            }
+
+            final Drawable drawable = mInfo.loadIcon(mPm);
+            if(drawable instanceof BitmapDrawable) {
+                BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
+                final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable).getBitmap();
+                if(bmIcon == null) {
+                    Log.i("peter", "==");
+                }
+                mMemoryCache.put(mInfo.packageName, bmIcon);
+                if (mCache.currentInfoId == mInfo.hashCode()) {
+                    mAct.runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            mCache.app_icon.setImageBitmap(bmIcon);
+                        }
+                    });
+                }
+            }else {
+                Log.i("peter", "mInfo=" + mInfo);
+                if (mCache.currentInfoId == mInfo.hashCode()) {
+                    mAct.runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            mCache.app_icon.setImageDrawable(drawable);
+                        }
+                    });
                 }
             }
         }
@@ -200,10 +217,5 @@ public class AppAdapter extends BaseAdapter {
         int currentInfoId;
     }
 
-    public static class AppInfo {
-        public String appName;
-        public String packageName;
-        public int count;
-    }
 
 }
