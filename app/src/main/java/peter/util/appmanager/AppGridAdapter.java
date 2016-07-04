@@ -1,5 +1,21 @@
 package peter.util.appmanager;
 
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.support.v4.util.LruCache;
+import android.support.v7.widget.RecyclerView;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,26 +27,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
-import android.support.v4.util.LruCache;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.ImageView;
-import android.widget.TextView;
+public class AppGridAdapter extends RecyclerView.Adapter<AppGridAdapter.Holder> {
 
-public class AppAdapter extends BaseAdapter {
-
-    private List<ApplicationInfo> mAppInfos = new ArrayList<>(1);
+    private List<ApplicationInfo> mAppInfos = new ArrayList<>();
     LayoutInflater factory;
     private MainActivity mAct;
     private LruCache<String, Bitmap> mMemoryCache;
@@ -40,7 +39,7 @@ public class AppAdapter extends BaseAdapter {
     private static final int MAXIMUM_POOL_SIZE = CPU_COUNT;
     private static final int KEEP_ALIVE = 1;
     private Executor thread_pool_executor;
-    private BlockingQueue<Runnable> sPoolWorkQueue = new LinkedBlockingQueue<>(15);
+    private BlockingQueue<Runnable> sPoolWorkQueue = new LinkedBlockingQueue<>(30);
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
         private final AtomicInteger mCount = new AtomicInteger(1);
 
@@ -49,7 +48,7 @@ public class AppAdapter extends BaseAdapter {
         }
     };
 
-    public AppAdapter(MainActivity act) {
+    public AppGridAdapter(MainActivity act) {
         mAct = act;
         factory = LayoutInflater.from(act);
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
@@ -73,14 +72,34 @@ public class AppAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
-    @Override
-    public int getCount() {
-        return mAppInfos.size();
+    private ApplicationInfo getItem(int position) {
+        return mAppInfos != null ? mAppInfos.get(position) : null;
     }
 
     @Override
-    public ApplicationInfo getItem(int position) {
-        return mAppInfos != null ? mAppInfos.get(position) : null;
+    public Holder onCreateViewHolder(ViewGroup parent, int viewType) {
+        return new Holder(factory.inflate(R.layout.gridviewitem, parent, false));
+    }
+
+    @Override
+    public void onBindViewHolder(Holder holder, int position) {
+        ApplicationInfo info = getItem(position);
+        if(info != null) {
+            holder.currentInfoId = info.hashCode();
+            holder.itemView.setTag(R.id.appinfo, info);
+            holder.itemView.setOnClickListener(mAct);
+
+            //取缓存图片
+            Bitmap bmIcon = mMemoryCache.get(info.packageName);
+            if (bmIcon == null) {
+                holder.app_icon.setImageResource(R.mipmap.ic_launcher);
+                holder.app_name.setText("...");
+                thread_pool_executor.execute(new ThreadPoolTask(mAct, holder, info, mMemoryCache, mAppNames));
+            } else {
+                holder.app_icon.setImageBitmap(bmIcon);
+                holder.app_name.setText(mAppNames.get(info.packageName));
+            }
+        }
     }
 
     @Override
@@ -89,52 +108,21 @@ public class AppAdapter extends BaseAdapter {
     }
 
     @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        // 获取数据
-        ApplicationInfo info = getItem(position);
-
-        // 获取View
-        ViewCache cache;
-        if (convertView == null) {
-            convertView = factory.inflate(R.layout.listviewitem, parent, false);
-            cache = new ViewCache();
-            cache.app_icon = (ImageView) convertView.findViewById(R.id.app_icon);
-            cache.app_name = (TextView) convertView.findViewById(R.id.app_name);
-            convertView.setTag(cache);
-        } else {
-            cache = (ViewCache) convertView.getTag();
-        }
-
-        // 绑定数据
-        cache.currentInfoId = info.hashCode();
-        convertView.setTag(R.id.appinfo, info);
-        convertView.setOnClickListener(mAct);
-
-        //取缓存图片
-        Bitmap bmIcon = mMemoryCache.get(info.packageName);
-        if (bmIcon == null) {
-            cache.app_icon.setImageResource(R.mipmap.ic_launcher);
-            cache.app_name.setText("...");
-            thread_pool_executor.execute(new ThreadPoolTask(mAct, cache, info, mMemoryCache, mAppNames));
-        } else {
-            cache.app_icon.setImageBitmap(bmIcon);
-            cache.app_name.setText(mAppNames.get(info.packageName));
-        }
-
-        return convertView;
+    public int getItemCount() {
+        return mAppInfos.size();
     }
 
     private static class ThreadPoolTask implements Runnable {
 
         static int rightIconSize;
-        ViewCache mCache;
+        Holder mCache;
         LruCache<String, Bitmap> mMemoryCache;
         PackageManager mPm;
         ApplicationInfo mInfo;
         MainActivity mAct;
         HashMap<String, String> mAppNames;
 
-        public ThreadPoolTask(MainActivity act, ViewCache cache, ApplicationInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
+        public ThreadPoolTask(MainActivity act, Holder cache, ApplicationInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
             mCache = cache;
             mInfo = info;
             mPm = act.getPackageManager();
@@ -146,7 +134,7 @@ public class AppAdapter extends BaseAdapter {
         @Override
         public void run() {
             mAppNames.put(mInfo.packageName, mInfo.loadLabel(mPm).toString());
-            if(mCache.currentInfoId == mInfo.hashCode()) {
+            if (mCache.currentInfoId == mInfo.hashCode()) {
                 mAct.runOnUiThread(new Runnable() {
 
                     @Override
@@ -157,10 +145,10 @@ public class AppAdapter extends BaseAdapter {
             }
 
             final Drawable drawable = mInfo.loadIcon(mPm);
-            if(drawable instanceof BitmapDrawable) {
+            if (drawable instanceof BitmapDrawable) {
                 BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
                 final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable).getBitmap();
-                if(bmIcon == null) {
+                if (bmIcon == null) {
                     Log.i("peter", "==");
                 }
                 mMemoryCache.put(mInfo.packageName, bmIcon);
@@ -173,7 +161,7 @@ public class AppAdapter extends BaseAdapter {
                         }
                     });
                 }
-            }else {
+            } else {
                 Log.i("peter", "mInfo=" + mInfo);
                 if (mCache.currentInfoId == mInfo.hashCode()) {
                     mAct.runOnUiThread(new Runnable() {
@@ -199,7 +187,7 @@ public class AppAdapter extends BaseAdapter {
         }
 
         private int getIconSize() {
-            if(rightIconSize == 0) {
+            if (rightIconSize == 0) {
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inJustDecodeBounds = true;
                 BitmapFactory.decodeResource(mAct.getResources(), R.mipmap.ic_launcher, options);
@@ -211,10 +199,16 @@ public class AppAdapter extends BaseAdapter {
     }
 
 
-    public static class ViewCache {
+    public static class Holder extends RecyclerView.ViewHolder {
         ImageView app_icon;
         TextView app_name;
         int currentInfoId;
+
+        public Holder(View itemView) {
+            super(itemView);
+            app_icon = (ImageView) itemView.findViewById(R.id.app_icon);
+            app_name = (TextView) itemView.findViewById(R.id.app_name);
+        }
     }
 
 

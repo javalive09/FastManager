@@ -6,27 +6,28 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ListView;
 import android.widget.PopupMenu;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-    AppAdapter appAdapter;
+    AppGridAdapter appAdapter;
     private static final int NO_SYS = 0;
     private static final int ALL = 1;
     private int showType;
@@ -36,9 +37,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ListView list = (ListView) findViewById(R.id.app_list);
-        appAdapter = new AppAdapter(this);
-        list.setAdapter(appAdapter);
+        RecyclerView recyclerView = (RecyclerView) findViewById(R.id.app_list);
+//        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        //        appAdapter = new AppListAdapter(this);
+
+        if(recyclerView != null) {
+            int itemW = getResources().getDimensionPixelSize(R.dimen.item_width);
+            Resources resources = this.getResources();
+            DisplayMetrics dm = resources.getDisplayMetrics();
+            int width = dm.widthPixels;
+
+            int count = width/ itemW;
+            recyclerView.setLayoutManager(new GridLayoutManager(this, count));
+            appAdapter = new AppGridAdapter(this);
+            recyclerView.setAdapter(appAdapter);
+        }
     }
 
     @Override
@@ -52,7 +65,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void run() {
                 showType = getShowType();
-                appAdapter.updataData(getAllAppInfos());
+                List<ApplicationInfo> infos = getAllAppInfos();
+                appAdapter.updataData(infos);
+                setTitle("AppManager(" + infos.size() + ")");
             }
         });
     }
