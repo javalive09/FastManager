@@ -6,10 +6,13 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.UserHandle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -22,7 +25,10 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.PopupMenu;
 
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -38,9 +44,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         RecyclerView recyclerView = (RecyclerView) findViewById(R.id.app_list);
-//        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        //        appAdapter = new AppListAdapter(this);
-
         if(recyclerView != null) {
             int itemW = getResources().getDimensionPixelSize(R.dimen.item_width);
             Resources resources = this.getResources();
@@ -52,24 +55,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             appAdapter = new AppGridAdapter(this);
             recyclerView.setAdapter(appAdapter);
         }
+
+        int type = getShowType();
+        refreshData(type);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        refreshData();
-    }
 
-    private void refreshData() {
-        runOnUiThread(new Runnable() {
+    private void refreshData(final int type) {
+        new AsyncTask<Void, Void, List<ApplicationInfo>>() {
+
             @Override
-            public void run() {
-                showType = getShowType();
-                List<ApplicationInfo> infos = getAllAppInfos();
-                appAdapter.updataData(infos);
-                setTitle("AppManager(" + infos.size() + ")");
+            protected void onPreExecute() {
+                showType = type;
+                findViewById(R.id.loading).setVisibility(View.VISIBLE);
+                findViewById(R.id.app_list).setVisibility(View.GONE);
+                super.onPreExecute();
             }
-        });
+
+            @Override
+            protected List<ApplicationInfo> doInBackground(Void... params) {
+                setShowType(type);
+                return getAllAppInfos();
+            }
+
+            @Override
+            protected void onPostExecute(List<ApplicationInfo> applicationInfos) {
+                findViewById(R.id.loading).setVisibility(View.GONE);
+                findViewById(R.id.app_list).setVisibility(View.VISIBLE);
+                appAdapter.updataData(applicationInfos);
+                setTitle("AppManager(" + applicationInfos.size() + ")");
+            }
+        }.execute();
     }
 
     private int getShowType() {
@@ -92,15 +108,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         List<ApplicationInfo> allNoSystemApps = new ArrayList<>(appList.size());
         String headPackageName = getHeadPackageName();
         Log.i("peter", "headPackageName = " + headPackageName);
+        ApplicationInfo headInfo = null;
         for (ApplicationInfo info : appList) {// 非系统APP
             if (info != null && !isSystemApp(info)
                     && !info.packageName.equals(getPackageName())) {
                 if (info.packageName.equals(headPackageName)) {
-                    allNoSystemApps.add(0, info);
+                    headInfo = info;
                 } else {
                     allNoSystemApps.add(info);
                 }
             }
+        }
+        Collections.sort(allNoSystemApps, new DisplayNameComparator(pm));
+        if(headInfo != null) {
+            allNoSystemApps.add(0, headInfo);
         }
         return allNoSystemApps;
     }
@@ -117,6 +138,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                showAlertDialog(getString(R.string.action_help),
 //                        getString(R.string.action_help_txt));
 //                break;
+            case R.id.action_refresh:
+                refreshData(showType);
+                break;
             case R.id.action_about:
                 showAlertDialog(getString(R.string.action_about),
                         getString(R.string.action_about_txt));
@@ -126,12 +150,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 sendMailByIntent();
                 break;
             case R.id.action_all_app:
-                setShowType(ALL);
-                refreshData();
+                refreshData(ALL);
                 break;
             case R.id.action_third_app:
-                setShowType(NO_SYS);
-                refreshData();
+                refreshData(NO_SYS);
                 break;
         }
         return super.onOptionsItemSelected(item);
@@ -189,7 +211,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onDestroy() {
         addClickCount(clickInfo);
         super.onDestroy();
-
     }
 
     private void showDetailStopView(ApplicationInfo info) {
@@ -284,4 +305,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
         popup.show();
     }
+
+    public static class DisplayNameComparator
+            implements Comparator<ApplicationInfo> {
+        public DisplayNameComparator(PackageManager pm) {
+            mPM = pm;
+            mCollator.setStrength(Collator.PRIMARY);
+        }
+
+        public final int compare(ApplicationInfo a, ApplicationInfo b) {
+            CharSequence  sa = a.loadLabel(mPM);
+            if (sa == null) sa = a.packageName;
+            CharSequence  sb = b.loadLabel(mPM);
+            if (sb == null) sb = b.packageName;
+
+            return mCollator.compare(sa.toString(), sb.toString());
+        }
+
+        private final Collator   mCollator = Collator.getInstance();
+        private PackageManager   mPM;
+    }
+
 }
