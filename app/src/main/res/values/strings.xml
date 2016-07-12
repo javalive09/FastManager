@@ -13,6 +13,7 @@
     <string name="action_thirdapp">不显示系统应用</string>
     <string name="action_feedback_txt">程序快速管理工具,可以清缓存,卸载软件</string>
     <item name="appinfo" type="id"></item>
+    <item name="appinfoid" type="id"></item>
 
     <string name="setting_feedback">反馈建议</string>
     <string name="setting_feedback_body">您的反馈和建议</string>
