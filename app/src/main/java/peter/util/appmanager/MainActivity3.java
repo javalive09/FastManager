@@ -21,6 +21,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.PopupMenu;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -223,6 +224,16 @@ public class MainActivity3 extends AppCompatActivity implements View.OnClickList
                         break;
                     case R.id.action_uninstall:
                         uninstallAPP(info);
+                        break;
+                    case R.id.action_share:
+                        String path = info.publicSourceDir;
+                        File srcFile = new File(path);
+                        Intent shareIntent = new Intent();
+                        shareIntent.setAction(Intent.ACTION_SEND);
+                        shareIntent.setType("application/vnd.android.package-archive");
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(srcFile));
+                        startActivity(Intent.createChooser(shareIntent, getResources().getText(R.string.action_share) + " " + info.name));
+
                         break;
                 }
                 clickInfo = info;

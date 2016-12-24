@@ -4,6 +4,7 @@
     <string name="action_detail">详细信息</string>
     <string name="action_launch">启动</string>
     <string name="action_uninstall">卸载</string>
+    <string name="action_share">分享</string>
     <string name="action_help_txt"></string>
     <string name="action_about">关于</string>
     <string name="action_refresh">刷新</string>

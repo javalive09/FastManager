@@ -15,4 +15,8 @@
         android:id="@+id/action_uninstall"
         android:orderInCategory="2"
         android:title="@string/action_uninstall"/>
+    <item
+        android:id="@+id/action_share"
+        android:orderInCategory="3"
+        android:title="@string/action_share"/>
 </menu>
