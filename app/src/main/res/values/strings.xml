@@ -12,7 +12,9 @@
     <string name="action_about_txt">程序快速管理工具,可以清缓存,卸载软件,采用优化算法,应用加载速度飞快,滚动丝般顺滑.上次操作过的应用显示在首行</string>
     <string name="action_feedback">反馈</string>
     <string name="action_allapp">显示全部应用</string>
-    <string name="action_thirdapp">不显示系统应用</string>
+    <string name="action_thirdapp">显示非系统应用</string>
+    <string name="action_grid">宫格方式排列</string>
+    <string name="action_list">列表方式排列</string>
     <string name="action_feedback_txt">程序快速管理工具,可以清缓存,卸载软件</string>
     <item name="appinfo" type="id"></item>
     <item name="appinfoid" type="id"></item>

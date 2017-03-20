@@ -29,11 +29,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * app manager 控制类
+ * <p>
  * Created by peter on 2017/3/20.
  */
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-
 
     private AppAdapter defaultAdapter;
     private AppGridAdapter appGridAdapter;
@@ -42,6 +43,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private RecyclerView recyclerView;
     private static final int NO_SYS = 0;
     private static final int ALL = 1;
+    private static final int LIST = 0;
+    private static final int GRID = 1;
     private DividerItemDecoration decoration;
     private int showType;
 
@@ -118,9 +121,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.action_show:
-                showSelectLayout();
-                break;
             case R.id.action_refresh:
                 refreshData(showType);
                 break;
@@ -138,23 +138,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.action_third_app:
                 refreshData(NO_SYS);
                 break;
+            case R.id.action_list:
+                if (getDefaultLayout() != LIST) {
+                    setDefaultLayout(LIST);
+                }
+                break;
+            case R.id.action_grid:
+                if (getDefaultLayout() != GRID) {
+                    setDefaultLayout(GRID);
+                }
+                break;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    private void showSelectLayout() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-        builder.setIcon(R.mipmap.ic_launcher);
-        builder.setTitle(R.string.setting_layout);
-        String[] layout = getResources().getStringArray(R.array.layout);
-        builder.setSingleChoiceItems(layout, getDefaultLayout(), new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                setDefaultLayout(which);
-                dialog.dismiss();
-            }
-        });
-        builder.show();
     }
 
     private int getDefaultLayout() {
