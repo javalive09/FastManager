@@ -2,20 +2,21 @@ package peter.util.appmanager;
 
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -23,67 +24,80 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.PopupMenu;
 
-import java.io.Serializable;
-import java.text.Collator;
+import java.io.File;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+
+/**
+ * Created by peter on 2017/3/20.
+ */
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-    AppGridAdapter appAdapter;
+
+    private AppAdapter defaultAdapter;
+    private AppGridAdapter appGridAdapter;
+    private AppListAdapter appListAdapter;
+    private ApplicationInfo clickInfo;
+    private RecyclerView recyclerView;
     private static final int NO_SYS = 0;
     private static final int ALL = 1;
+    private DividerItemDecoration decoration;
     private int showType;
-    ApplicationInfo clickInfo;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        RecyclerView recyclerView = (RecyclerView) findViewById(R.id.app_list);
-        if(recyclerView != null) {
-            int itemW = getResources().getDimensionPixelSize(R.dimen.item_width);
-            Resources resources = this.getResources();
-            DisplayMetrics dm = resources.getDisplayMetrics();
-            int width = dm.widthPixels;
-
-            int count = width/ itemW;
-            recyclerView.setLayoutManager(new GridLayoutManager(this, count));
-            appAdapter = new AppGridAdapter(this);
-            recyclerView.setAdapter(appAdapter);
+        recyclerView = (RecyclerView) findViewById(R.id.app_list);
+        if (recyclerView != null) {
+            recyclerView.setItemAnimator(new DefaultItemAnimator());
+            appGridAdapter = new AppGridAdapter(MainActivity.this);
+            appListAdapter = new AppListAdapter(MainActivity.this);
+            decoration = new DividerItemDecoration(
+                    MainActivity.this, DividerItemDecoration.VERTICAL_LIST);
+            setDefaultLayout(getDefaultLayout());
         }
-
-        int type = getShowType();
-        refreshData(type);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshData(getShowType());
+    }
+
+    private String getHeadPackageName() {
+        return getSharedPreferences("head_item", MODE_PRIVATE).getString("package_name", "");
+    }
 
     private void refreshData(final int type) {
-        new AsyncTask<Void, Void, List<ApplicationInfo>>() {
-
-            @Override
-            protected void onPreExecute() {
-                showType = type;
-                findViewById(R.id.loading).setVisibility(View.VISIBLE);
-                findViewById(R.id.app_list).setVisibility(View.GONE);
-                super.onPreExecute();
+        setShowType(type);
+        PackageManager packageManager = getPackageManager();
+        List<ApplicationInfo> appList = packageManager.getInstalledApplications(0);
+        ArrayList<ApplicationInfo> list = new ArrayList<>(appList.size());
+        String headPackageName = getHeadPackageName();
+        for (ApplicationInfo info : appList) {
+            if (info != null && !isSystemApp(info) && !info.packageName.equals(getPackageName())) {
+                if (info.packageName.equals(headPackageName)) {
+                    list.add(0, info);
+                } else {
+                    list.add(info);
+                }
             }
+        }
+        appGridAdapter.updataData(list);
+        setTitle("AppManager(" + list.size() + ")");
+    }
 
-            @Override
-            protected List<ApplicationInfo> doInBackground(Void... params) {
-                setShowType(type);
-                return getAllAppInfos();
-            }
-
-            @Override
-            protected void onPostExecute(List<ApplicationInfo> applicationInfos) {
-                findViewById(R.id.loading).setVisibility(View.GONE);
-                findViewById(R.id.app_list).setVisibility(View.VISIBLE);
-                appAdapter.updataData(applicationInfos);
-                setTitle("AppManager(" + applicationInfos.size() + ")");
-            }
-        }.execute();
+    private boolean isSystemApp(ApplicationInfo appInfo) {
+        if (showType == ALL) {
+            return false;
+        }
+        if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) > 0) {// system apps
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private int getShowType() {
@@ -92,37 +106,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void setShowType(int type) {
-        getSharedPreferences("showType", MODE_PRIVATE).edit().putInt("showType", type).commit();
-    }
-
-    /**
-     * 获取所有的应用信息
-     *
-     * @return
-     */
-    private List<ApplicationInfo> getAllAppInfos() {
-        PackageManager pm = getPackageManager();
-        List<ApplicationInfo> appList = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        List<ApplicationInfo> allNoSystemApps = new ArrayList<>(appList.size());
-        String headPackageName = getHeadPackageName();
-        Log.i("peter", "headPackageName = " + headPackageName);
-        ApplicationInfo headInfo = null;
-        for (ApplicationInfo info : appList) {// 非系统APP
-            info.loadLabel(pm);
-            if (info != null && !isSystemApp(info)
-                    && !info.packageName.equals(getPackageName())) {
-                if (info.packageName.equals(headPackageName)) {
-                    headInfo = info;
-                } else {
-                    allNoSystemApps.add(info);
-                }
-            }
-        }
-//        Collections.sort(allNoSystemApps, new DisplayNameComparator(pm));
-        if(headInfo != null) {
-            allNoSystemApps.add(0, headInfo);
-        }
-        return allNoSystemApps;
+        showType = type;
+        getSharedPreferences("showType", MODE_PRIVATE).edit().putInt("showType", type).apply();
     }
 
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -133,10 +118,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-//            case R.id.action_help:
-//                showAlertDialog(getString(R.string.action_help),
-//                        getString(R.string.action_help_txt));
-//                break;
+            case R.id.action_show:
+                showSelectLayout();
+                break;
             case R.id.action_refresh:
                 refreshData(showType);
                 break;
@@ -158,23 +142,59 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return super.onOptionsItemSelected(item);
     }
 
+    private void showSelectLayout() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+        builder.setIcon(R.mipmap.ic_launcher);
+        builder.setTitle(R.string.setting_layout);
+        String[] layout = getResources().getStringArray(R.array.layout);
+        builder.setSingleChoiceItems(layout, getDefaultLayout(), new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                setDefaultLayout(which);
+                dialog.dismiss();
+            }
+        });
+        builder.show();
+    }
+
+    private int getDefaultLayout() {
+        int type = getSharedPreferences("layout", MODE_PRIVATE).getInt("layout", 0);
+        return type;
+    }
+
+    private AppAdapter setDefaultAdapter(int layout) {
+        switch (layout) {
+            case 0:
+                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+                recyclerView.addItemDecoration(decoration);
+                defaultAdapter = appListAdapter;
+                break;
+            case 1:
+                int itemW = getResources().getDimensionPixelSize(R.dimen.item_cell);
+                Resources resources = MainActivity.this.getResources();
+                DisplayMetrics dm = resources.getDisplayMetrics();
+                int width = dm.widthPixels;
+                int count = width / itemW;
+                recyclerView.removeItemDecoration(decoration);
+                recyclerView.setLayoutManager(new GridLayoutManager(MainActivity.this, count));
+                defaultAdapter = appGridAdapter;
+                break;
+        }
+        recyclerView.setAdapter(defaultAdapter);
+        return defaultAdapter;
+    }
+
+    private void setDefaultLayout(int layout) {
+        getSharedPreferences("layout", MODE_PRIVATE).edit().putInt("layout", layout).apply();
+        setDefaultAdapter(layout);
+    }
+
     public void sendMailByIntent() {
         Intent data = new Intent(Intent.ACTION_SENDTO);
         data.setData(Uri.parse(getString(R.string.setting_feedback_address)));
         data.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.setting_feedback));
         data.putExtra(Intent.EXTRA_TEXT, getString(R.string.setting_feedback_body));
         startActivity(data);
-    }
-
-    private boolean isSystemApp(ApplicationInfo appInfo) {
-        if (showType == ALL) {
-            return false;
-        }
-        if ((appInfo.flags & ApplicationInfo.FLAG_SYSTEM) > 0) {// system apps
-            return true;
-        } else {
-            return false;
-        }
     }
 
     public AlertDialog showAlertDialog(String title, String content) {
@@ -195,11 +215,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private String getHeadPackageName() {
-        return getSharedPreferences("head_item", MODE_PRIVATE).getString("package_name", "");
-    }
-
-    private void addClickCount(ApplicationInfo info ) {
+    private void addClickCount(ApplicationInfo info) {
         if (info != null) {
             SharedPreferences headSp = getSharedPreferences("head_item", MODE_PRIVATE);
             headSp.edit().putString("package_name", info.packageName).commit();
@@ -251,9 +267,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         PopupMenu popup = new PopupMenu(this, anchor);
         popup.setGravity(Gravity.END);
         final Intent launchIntent = getLaunchIntent(info);
-        if(launchIntent != null) {
+        if (launchIntent != null) {
             popup.getMenuInflater().inflate(R.menu.operate1, popup.getMenu());
-        }else {
+        } else {
             popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
         }
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
@@ -268,21 +284,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     case R.id.action_uninstall:
                         uninstallAPP(info);
                         break;
+                    case R.id.action_share:
+                        String path = info.publicSourceDir;
+                        File srcFile = new File(path);
+                        Intent shareIntent = new Intent();
+                        shareIntent.setAction(Intent.ACTION_SEND);
+                        shareIntent.setType("application/vnd.android.package-archive");
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(srcFile));
+                        startActivity(Intent.createChooser(shareIntent, getResources().getText(R.string.action_share) + " " + info.name));
+
+                        break;
                 }
                 clickInfo = info;
                 return true;
             }
         });
         popup.show();
+
     }
 
     private void popupMenuNormal(final View anchor) {
         final ApplicationInfo info = (ApplicationInfo) anchor.getTag(R.id.appinfo);
         PopupMenu popup = new PopupMenu(this, anchor);
         final Intent launchIntent = getLaunchIntent(info);
-        if(launchIntent != null) {
+        if (launchIntent != null) {
             popup.getMenuInflater().inflate(R.menu.operate1, popup.getMenu());
-        }else {
+        } else {
             popup.getMenuInflater().inflate(R.menu.operate, popup.getMenu());
         }
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
@@ -305,30 +332,5 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         popup.show();
     }
 
-    public static class DisplayNameComparator
-            implements Comparator<ApplicationInfo> {
-        public DisplayNameComparator(PackageManager pm) {
-            mPM = pm;
-            mCollator.setStrength(Collator.PRIMARY);
-        }
-
-        public final int compare(ApplicationInfo a, ApplicationInfo b) {
-            CharSequence  sa = a.loadLabel(mPM);
-            if (sa == null) sa = a.packageName;
-            CharSequence  sb = b.loadLabel(mPM);
-            if (sb == null) sb = b.packageName;
-
-            return mCollator.compare(sa.toString(), sb.toString());
-        }
-
-        private final Collator   mCollator = Collator.getInstance();
-        private PackageManager   mPM;
-    }
-
-    private static class ByFirstStringComparator implements Comparator<String[]>, Serializable {
-        public int compare(String[] o1, String[] o2) {
-            return o1[0].compareTo(o2[0]);
-        }
-    }
 
 }

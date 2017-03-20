@@ -6,6 +6,7 @@
     <string name="action_uninstall">卸载</string>
     <string name="action_share">分享</string>
     <string name="action_help_txt"></string>
+    <string name="action_show">显示方式</string>
     <string name="action_about">关于</string>
     <string name="action_refresh">刷新</string>
     <string name="action_about_txt">程序快速管理工具,可以清缓存,卸载软件,采用优化算法,应用加载速度飞快,滚动丝般顺滑.上次操作过的应用显示在首行</string>
@@ -17,7 +18,13 @@
     <item name="appinfoid" type="id"></item>
 
     <string name="setting_feedback">反馈建议</string>
+    <string name="setting_layout">布局类型</string>
     <string name="setting_feedback_body">您的反馈和建议</string>
     <string name="setting_feedback_address">mailto:javalive09@163.com</string>
+
+    <string-array name="layout">
+        <item>列表</item>
+        <item>宫格</item>
+    </string-array>
 
 </resources>

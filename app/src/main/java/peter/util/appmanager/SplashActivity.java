@@ -18,7 +18,7 @@ public class SplashActivity extends Activity {
             public boolean queueIdle() {
                 Manager manager = (Manager) getApplication();
                 manager.init();
-                startActivity(new Intent(SplashActivity.this, MainActivity2.class));
+                startActivity(new Intent(SplashActivity.this, MainActivity.class));
                 finish();
                 return false;
             }

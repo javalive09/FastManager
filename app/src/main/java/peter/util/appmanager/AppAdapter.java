@@ -27,19 +27,19 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder> {
+public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
 
-    private List<ApplicationInfo> mAppInfos = new ArrayList<>();
-    LayoutInflater factory;
-    private MainActivity3 mAct;
-    private LruCache<String, Bitmap> mMemoryCache;
-    private HashMap<String, String> mAppNames = new HashMap<>();
+    private static List<ApplicationInfo> mAppList = new ArrayList<>();
+    protected static LayoutInflater factory;
+    private MainActivity mAct;
+    private static LruCache<String, Bitmap> mMemoryCache;
+    private static HashMap<String, String> mAppNames = new HashMap<>();
     private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
     private static final int CORE_POOL_SIZE = CPU_COUNT + 1;
     private static final int MAXIMUM_POOL_SIZE = CPU_COUNT * 2 + 1;
     private static final int KEEP_ALIVE = 1;
-    private Executor thread_pool_executor;
-    private BlockingQueue<Runnable> sPoolWorkQueue = new LinkedBlockingQueue<>(50);
+    private static Executor thread_pool_executor;
+    private static final BlockingQueue<Runnable> sPoolWorkQueue = new LinkedBlockingQueue<>(50);
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
         private final AtomicInteger mCount = new AtomicInteger(1);
 
@@ -48,7 +48,7 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
         }
     };
 
-    public AppGridAdapter3(MainActivity3 act) {
+    public AppAdapter(MainActivity act) {
         mAct = act;
         factory = LayoutInflater.from(act);
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
@@ -68,18 +68,17 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
     }
 
     public void updataData(List<ApplicationInfo> list) {
-        mAppInfos = list;
+        mAppList = list;
         notifyDataSetChanged();
     }
 
-
     private ApplicationInfo getItem(int position) {
-        return mAppInfos != null ? mAppInfos.get(position) : null;
+        return mAppList != null ? mAppList.get(position) : null;
     }
 
     @Override
     public Holder onCreateViewHolder(ViewGroup parent, int viewType) {
-        return new Holder(factory.inflate(R.layout.gridviewitem, parent, false));
+        return new Holder(factory.inflate(R.layout.listviewitem, parent, false));
     }
 
     @Override
@@ -110,7 +109,7 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
 
     @Override
     public int getItemCount() {
-        return mAppInfos.size();
+        return mAppList.size();
     }
 
     private static class ThreadPoolTask implements Runnable {
@@ -120,10 +119,10 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
         LruCache<String, Bitmap> mMemoryCache;
         PackageManager mPm;
         ApplicationInfo mInfo;
-        MainActivity3 mAct;
+        MainActivity mAct;
         HashMap<String, String> mAppNames;
 
-        public ThreadPoolTask(MainActivity3 act, Holder holder, ApplicationInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
+        public ThreadPoolTask(MainActivity act, Holder holder, ApplicationInfo info, LruCache<String, Bitmap> memoryCache, HashMap<String, String> names) {
             mHolder = holder;
             mInfo = info;
             mPm = act.getPackageManager();
@@ -134,11 +133,15 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
 
         @Override
         public void run() {
-            mAppNames.put(mInfo.packageName, mInfo.loadLabel(mPm).toString());
+            String appName = mInfo.loadLabel(mPm).toString();
+            mAppNames.put(mInfo.packageName, appName);
+            if(appName.contains("Android Easter")) {
+                Log.i("peter", "==");
+            }
             final Drawable drawable = mInfo.loadIcon(mPm);
             if (drawable instanceof BitmapDrawable) {
                 BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
-                final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable).getBitmap();
+                final Bitmap bmIcon = getRightSizeIcon(bitmapDrawable, 1.0f).getBitmap();
                 if (bmIcon != null) {
                     mMemoryCache.put(mInfo.packageName, bmIcon);
                     ApplicationInfo info = (ApplicationInfo) mHolder.app_icon.getTag();
@@ -175,11 +178,11 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
 
         }
 
-        private BitmapDrawable getRightSizeIcon(BitmapDrawable drawable) {
+        private BitmapDrawable getRightSizeIcon(BitmapDrawable drawable, float mScale) {
             int size = getIconSize();
             Log.i("peter", "rightSize" + size);
             Bitmap bitmap = drawable.getBitmap();
-            float scale = (size * 1.f) / (bitmap.getWidth() * 1.f);
+            float scale = (size * mScale) / (bitmap.getWidth() * mScale);
             Matrix matrix = new Matrix();
             matrix.setScale(scale, scale);
             Bitmap bm = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
@@ -198,7 +201,7 @@ public class AppGridAdapter3 extends RecyclerView.Adapter<AppGridAdapter3.Holder
 
     }
 
-    public static class Holder extends RecyclerView.ViewHolder {
+    static class Holder extends RecyclerView.ViewHolder {
         ImageView app_icon;
         TextView app_name;
 
